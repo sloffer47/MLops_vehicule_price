@@ -21,7 +21,7 @@ RUN pip install --upgrade pip \
 # 6️⃣ Copier le code source
 COPY . .
 
-# 7️⃣ Créer les dossiers pour modèles et données
+# 7️⃣ Créer les dossiers pour modèles et données ...
 RUN mkdir -p models data/processed data/raw
 
 # 8️⃣ Exposer le port FastAPI
