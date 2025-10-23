@@ -1,0 +1,22 @@
+artifact_path: file:///C:/Users/myori/OneDrive/%D0%94%D0%BE%D0%BA%D1%83%D0%BC%D0%B5%D0%BD%D1%82%D0%B8/PROJETS/MLops_vehicule_price/mlruns/705758440503717748/models/m-5cb910e9587640d2bc40ea6839b83193/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.13.5
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.7.2
+mlflow_version: 3.5.1
+model_id: m-5cb910e9587640d2bc40ea6839b83193
+model_size_bytes: 653
+model_uuid: m-5cb910e9587640d2bc40ea6839b83193
+prompts: null
+run_id: dbf3e5cd4f8b413281d2e629e1e19c79
+utc_time_created: '2025-10-23 14:40:31.676803'

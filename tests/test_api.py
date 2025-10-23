@@ -43,7 +43,7 @@ def test_prediction():
         "transmission": "Automatic",
         "owner": "First",
         "engine_cc": 1500,
-        "seats": 5
+        "seats": 1
     }
     
     print(f"Données envoyées: {json.dumps(car_data, indent=2)}")
@@ -71,7 +71,7 @@ def test_batch_prediction():
             "transmission": "Automatic",
             "owner": "First",
             "engine_cc": 1500,
-            "seats": 5
+            "seats": 1
         },
         {
             "year": 2018,
@@ -80,16 +80,16 @@ def test_batch_prediction():
             "transmission": "Manual",
             "owner": "Second",
             "engine_cc": 1200,
-            "seats": 5
+            "seats": 10
         },
         {
             "year": 2022,
             "km_driven": 15000,
             "fuel": "Electric",
-            "transmission": "Automatic",
+            "transmission": "Manuel",
             "owner": "First",
-            "engine_cc": 0,
-            "seats": 5
+            "engine_cc": 10,
+            "seats":1
         }
     ]
     
