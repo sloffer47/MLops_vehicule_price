@@ -2,13 +2,13 @@ pipeline {
     agent any
 
     environment {
-        EC2_HOST = '13.61.100.51'                         // ✅ Nouvelle IP EC2
-        EC2_USER = 'ubuntu'                               // Utilisateur EC2 par défaut
+        EC2_HOST = '51.21.194.2'                          // ✅ NOUVELLE IP EC2
+        EC2_USER = 'ubuntu'                               // Utilisateur Ubuntu
         APP_NAME = 'vehicule_price_api'                   // Nom du container / app
-        GITHUB_REPO = 'https://github.com/sloffer47/MLops_vehicule_price.git'   // ⚙️ Ton repo GitHub
-        SSH_CREDENTIALS = 'serveur_ssh_key'               // ⚙️ Nom du credential Jenkins (clé SSH)
-        DOCKER_IMAGE = 'vehicule-price-api:latest'        // Nom de ton image Docker locale
-        APP_PORT = '8000'                                 // Port exposé par FastAPI
+        GITHUB_REPO = 'https://github.com/sloffer47/MLops_vehicule_price.git'
+        SSH_CREDENTIALS = 'server_key1'                   // ⚙️ Nom du credential (server_key1)
+        DOCKER_IMAGE = 'vehicule-price-api:latest'        // Nom de l'image Docker
+        APP_PORT = '8000'                                 // Port FastAPI
     }
 
     stages {
@@ -30,15 +30,16 @@ pipeline {
 
         stage('🔑 Test SSH Connection to EC2') {
             steps {
-                sshagent(['serveur_ssh_key']) {
-                    sh 'ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "echo ✅ Connexion SSH OK"'
+                echo '🔐 Test de connexion SSH au serveur EC2...'
+                sshagent(['server_key1']) {
+                    sh 'ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "echo ✅ Connexion SSH réussie au serveur 51.21.194.2"'
                 }
             }
         }
 
         stage('🚀 Deploy to EC2 Server') {
             steps {
-                echo '🚢 Déploiement du container sur EC2...'
+                echo '🚢 Déploiement du container sur EC2 (51.21.194.2)...'
                 sshagent(credentials: ["${SSH_CREDENTIALS}"]) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
@@ -47,7 +48,7 @@ pipeline {
                             docker rm ${APP_NAME} 2>/dev/null || true
                             docker rmi ${DOCKER_IMAGE} 2>/dev/null || true
 
-                            echo "📥 Mise à jour du code source..."
+                            echo "📥 Mise à jour du code source depuis GitHub..."
                             if [ -d "${APP_NAME}" ]; then
                                 cd ${APP_NAME}
                                 git pull origin main
@@ -60,17 +61,17 @@ pipeline {
                             cd ${APP_NAME}
                             docker build -t ${DOCKER_IMAGE} .
 
-                            echo "🚀 Lancement du container..."
+                            echo "🚀 Lancement du container sur le port ${APP_PORT}..."
                             docker run -d \\
                                 --name ${APP_NAME} \\
                                 -p ${APP_PORT}:${APP_PORT} \\
                                 --restart unless-stopped \\
                                 ${DOCKER_IMAGE}
 
-                            echo "✅ Container déployé !"
+                            echo "✅ Container déployé avec succès !"
                             docker ps | grep ${APP_NAME} || (echo "❌ Erreur de déploiement !" && exit 1)
 
-                            echo "🧹 Nettoyage des images inutiles..."
+                            echo "🧹 Nettoyage des images Docker inutiles..."
                             docker image prune -f
                         '
                     """
@@ -80,7 +81,7 @@ pipeline {
 
         stage('🏥 Health Check') {
             steps {
-                echo '💊 Vérification de la santé du service...'
+                echo '💊 Vérification de la santé de l’API...'
                 script {
                     sleep(10)
                     try {
@@ -89,12 +90,13 @@ pipeline {
                             returnStdout: true
                         ).trim()
                         if (response == '200') {
-                            echo "✅ SUCCESS: API accessible à http://${EC2_HOST}:${APP_PORT}/docs"
+                            echo "✅ SUCCESS: API accessible et opérationnelle !"
+                            echo "📖 Documentation Swagger: http://${EC2_HOST}:${APP_PORT}/docs"
                         } else {
-                            echo "⚠️ WARNING: Réponse HTTP inattendue: ${response}"
+                            echo "⚠️ WARNING: Code de réponse HTTP: ${response}"
                         }
                     } catch (Exception e) {
-                        echo "⚠️ Impossible de tester l'API — vérifier le port ou le pare-feu."
+                        echo "⚠️ Impossible de tester l’API - Vérifiez le Security Group AWS (port ${APP_PORT})"
                     }
                 }
             }
@@ -106,14 +108,16 @@ pipeline {
             echo """
             🎉🎉🎉 DÉPLOIEMENT RÉUSSI 🎉🎉🎉
 
-            🚗 Ton API est accessible ici :
-            🌐 http://${EC2_HOST}:${APP_PORT}/docs
+            🚗 Votre API MLOps de prédiction de prix de véhicules est accessible :
+            🌐 Swagger UI: http://51.21.194.2:8000/docs
+            🏥 Health Check: http://51.21.194.2:8000/health
+            🔮 Prédiction: http://51.21.194.2:8000/predict
 
-            🔍 Vérifie les logs du container :
-            docker logs ${APP_NAME}
-
-            📊 Conteneurs actifs :
+            🔍 Commandes utiles :
+            ssh -i server_key1.pem ubuntu@51.21.194.2
+            docker logs vehicule_price_api
             docker ps
+            curl http://51.21.194.2:8000/health
             """
         }
 
@@ -121,10 +125,15 @@ pipeline {
             echo """
             ❌ DÉPLOIEMENT ÉCHOUÉ ❌
 
-            Vérifie les logs pour trouver le problème :
-            ssh -i serveur_KEY.pem ubuntu@${EC2_HOST}
-            docker logs ${APP_NAME}
+            🔍 Vérifiez les logs pour identifier le problème :
+            ssh -i server_key1.pem ubuntu@51.21.194.2
+            docker logs vehicule_price_api
             docker ps -a
+
+            ⚙️ Vérifiez aussi :
+            - Le Security Group AWS (port 8000 ouvert ?)
+            - Docker est installé sur EC2 ?
+            - Les credentials SSH dans Jenkins sont corrects ?
             """
         }
 
