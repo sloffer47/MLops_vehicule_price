@@ -1,0 +1,10 @@
+artifact_location: file:///C:/Users/myori/OneDrive/%D0%94%D0%BE%D0%BA%D1%83%D0%BC%D0%B5%D0%BD%D1%82%D0%B8/PROJETS/MLops_vehicule_price/mlruns/705758440503717748/models/m-ba0cf7dbdffa45f2ade429e96292e22d/artifacts
+creation_timestamp: 1761211513491
+experiment_id: '705758440503717748'
+last_updated_timestamp: 1761211520214
+model_id: m-ba0cf7dbdffa45f2ade429e96292e22d
+model_type: null
+name: model
+source_run_id: 385fa7ba1e8744e3b2d9566af3349146
+status: 2
+status_message: null

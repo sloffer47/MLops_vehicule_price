@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/myori/OneDrive/%D0%94%D0%BE%D0%BA%D1%83%D0%BC%D0%B5%D0%BD%D1%82%D0%B8/PROJETS/MLops_vehicule_price/mlruns/705758440503717748/6b7d75e84fc5429b919821cddaa180ac/artifacts
+end_time: 1761211532059
+entry_point_name: ''
+experiment_id: '705758440503717748'
+lifecycle_stage: active
+run_id: 6b7d75e84fc5429b919821cddaa180ac
+run_name: ridge_experiment
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1761211527438
+status: 3
+tags: []
+user_id: myori
