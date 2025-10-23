@@ -31,7 +31,7 @@ pipeline {
         stage('🔑 Test SSH Connection to EC2') {
             steps {
                 echo '🔐 Test de connexion SSH au serveur EC2...'
-                sshagent(['server_key1']) {
+                sshagent([SSH_CREDENTIALS]) {
                     sh 'ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "echo ✅ Connexion SSH réussie au serveur 51.21.194.2"'
                 }
             }
@@ -40,16 +40,16 @@ pipeline {
         stage('🚀 Deploy to EC2 Server') {
             steps {
                 echo '🚢 Déploiement du container sur EC2 (51.21.194.2)...'
-                sshagent(credentials: ["${SSH_CREDENTIALS}"]) {
+                sshagent(credentials: [SSH_CREDENTIALS]) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
-                            echo "🧹 Nettoyage des anciens containers..."
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "bash -c '
+                            echo \\"🧹 Nettoyage des anciens containers...\\"
                             docker stop ${APP_NAME} 2>/dev/null || true
                             docker rm ${APP_NAME} 2>/dev/null || true
                             docker rmi ${DOCKER_IMAGE} 2>/dev/null || true
 
-                            echo "📥 Mise à jour du code source depuis GitHub..."
-                            if [ -d "${APP_NAME}" ]; then
+                            echo \\"📥 Mise à jour du code source depuis GitHub...\\"
+                            if [ -d \\\"${APP_NAME}\\\" ]; then
                                 cd ${APP_NAME}
                                 git pull origin main
                                 cd ..
@@ -57,23 +57,19 @@ pipeline {
                                 git clone ${GITHUB_REPO}
                             fi
 
-                            echo "🔨 Construction de l'image Docker..."
+                            echo \\"🔨 Construction de l'image Docker...\\"
                             cd ${APP_NAME}
                             docker build -t ${DOCKER_IMAGE} .
 
-                            echo "🚀 Lancement du container sur le port ${APP_PORT}..."
-                            docker run -d \\
-                                --name ${APP_NAME} \\
-                                -p ${APP_PORT}:${APP_PORT} \\
-                                --restart unless-stopped \\
-                                ${DOCKER_IMAGE}
+                            echo \\"🚀 Lancement du container sur le port ${APP_PORT}...\\"
+                            docker run -d --name ${APP_NAME} -p ${APP_PORT}:${APP_PORT} --restart unless-stopped ${DOCKER_IMAGE}
 
-                            echo "✅ Container déployé avec succès !"
-                            docker ps | grep ${APP_NAME} || (echo "❌ Erreur de déploiement !" && exit 1)
+                            echo \\"✅ Container déployé avec succès !\\"
+                            docker ps | grep ${APP_NAME} || (echo \\"❌ Erreur de déploiement !\\" && exit 1)
 
-                            echo "🧹 Nettoyage des images Docker inutiles..."
+                            echo \\"🧹 Nettoyage des images Docker inutiles...\\"
                             docker image prune -f
-                        '
+                        '"
                     """
                 }
             }
