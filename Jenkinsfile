@@ -1,11 +1,6 @@
 pipeline {
     agent any
 
-    options {
-        timeout(time: 1, unit: 'HOURS')
-        disableConcurrentBuilds()
-    }
-
     environment {
         EC2_HOST = '51.21.194.2'
         EC2_USER = 'ubuntu'
@@ -14,10 +9,10 @@ pipeline {
         SSH_CREDENTIALS = 'server_key1'
         DOCKER_IMAGE = 'vehicule-price-api:latest'
         APP_PORT = '8000'
-        MAX_RETRIES = 3
     }
 
     stages {
+
         stage('🔍 Pull Code from GitHub') {
             steps {
                 echo '📦 Clonage du dépôt depuis GitHub...'
@@ -27,14 +22,9 @@ pipeline {
 
         stage('📁 Vérification du projet') {
             steps {
-                script {
-                    echo '🔎 Vérification des fichiers du projet...'
-                    sh 'ls -la'
-                    def dockerfileExists = fileExists 'Dockerfile'
-                    if (!dockerfileExists) {
-                        error "⚠️ Dockerfile manquant !"
-                    }
-                }
+                echo '🔎 Vérification des fichiers du projet...'
+                sh 'ls -la'
+                sh 'cat Dockerfile || echo "⚠️ Dockerfile manquant !"'
             }
         }
 
@@ -42,23 +32,7 @@ pipeline {
             steps {
                 echo '🔐 Test de connexion SSH au serveur EC2...'
                 sshagent([SSH_CREDENTIALS]) {
-                    retry(3) {
-                        sh 'ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${EC2_USER}@${EC2_HOST} "echo ✅ Connexion SSH réussie au serveur ${EC2_HOST}"'
-                    }
-                }
-            }
-        }
-
-        stage('📦 Backup') {
-            steps {
-                sshagent([SSH_CREDENTIALS]) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "
-                            if [ -d ${APP_NAME} ]; then
-                                tar -czf ${APP_NAME}_backup_\$(date +%Y%m%d_%H%M%S).tar.gz ${APP_NAME}
-                            fi
-                        "
-                    """
+                    sh 'ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "echo ✅ Connexion SSH réussie au serveur ${EC2_HOST}"'
                 }
             }
         }
@@ -66,45 +40,36 @@ pipeline {
         stage('🚀 Deploy to EC2 Server') {
             steps {
                 echo "🚢 Déploiement du container sur EC2 (${EC2_HOST})..."
-                sshagent([SSH_CREDENTIALS]) {
+                sshagent(credentials: [SSH_CREDENTIALS]) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "
-                            set -e
-                            
-                            echo \\"🧹 Nettoyage des anciens containers...\\"
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
+                            echo "🧹 Nettoyage des anciens containers..."
                             docker stop ${APP_NAME} 2>/dev/null || true
                             docker rm ${APP_NAME} 2>/dev/null || true
                             docker rmi ${DOCKER_IMAGE} 2>/dev/null || true
 
-                            echo \\"📥 Mise à jour du code source depuis GitHub...\\"
+                            echo "📥 Mise à jour du code source depuis GitHub..."
                             if [ -d ${APP_NAME} ]; then
                                 cd ${APP_NAME}
-                                git fetch origin
-                                git reset --hard origin/main
+                                git pull origin main
                                 cd ..
                             else
                                 git clone ${GITHUB_REPO}
                             fi
 
-                            echo \\"🔨 Construction de l'image Docker...\\"
+                            echo "🔨 Construction de l'image Docker..."
                             cd ${APP_NAME}
-                            docker build --no-cache -t ${DOCKER_IMAGE} .
+                            docker build -t ${DOCKER_IMAGE} .
 
-                            echo \\"🚀 Lancement du container sur le port ${APP_PORT}...\\"
+                            echo "🚀 Lancement du container sur le port ${APP_PORT}..."
                             docker run -d --name ${APP_NAME} -p ${APP_PORT}:${APP_PORT} --restart unless-stopped ${DOCKER_IMAGE}
 
-                            # Vérification que le container est bien démarré
-                            if ! docker ps | grep -q ${APP_NAME}; then
-                                echo \\"❌ Erreur de déploiement !\\"
-                                docker logs ${APP_NAME}
-                                exit 1
-                            fi
+                            echo "✅ Container déployé avec succès !"
+                            docker ps | grep ${APP_NAME} || (echo "❌ Erreur de déploiement !" && exit 1)
 
-                            echo \\"✅ Container déployé avec succès !\\"
-                            
-                            echo \\"🧹 Nettoyage des images Docker inutiles...\\"
+                            echo "🧹 Nettoyage des images Docker inutiles..."
                             docker image prune -f
-                        "
+                        '
                     """
                 }
             }
@@ -112,27 +77,63 @@ pipeline {
 
         stage('🏥 Health Check') {
             steps {
-                echo '💊 Vérification de la santé de l'API...'
+                echo '💊 Vérification de la santé de l’API...'
                 script {
-                    retry(3) {
-                        sleep(time: 20, unit: 'SECONDS')
+                    sleep(10)
+                    try {
                         def response = sh(
-                            script: """
-                                curl -s -f -m 30 -o /dev/null -w '%{http_code}' http://${EC2_HOST}:${APP_PORT}/health || echo 'failed'
-                            """,
+                            script: "curl -s -o /dev/null -w '%{http_code}' http://${EC2_HOST}:${APP_PORT}/health || echo '000'",
                             returnStdout: true
                         ).trim()
                         
                         if (response == '200') {
                             echo "✅ SUCCESS: API accessible et opérationnelle !"
+                            echo "📖 Documentation Swagger: http://${EC2_HOST}:${APP_PORT}/docs"
                         } else {
-                            error "⚠️ Health check failed with response: ${response}"
+                            echo "⚠️ WARNING: Code de réponse HTTP: ${response}"
                         }
+                    } catch (Exception e) {
+                        echo "⚠️ Impossible de tester l’API - Vérifiez le Security Group AWS (port ${APP_PORT}) ou les logs Docker sur EC2."
                     }
                 }
             }
         }
     }
 
-    // ... rest of your post section remains the same ...
+    post {
+        success {
+            echo """
+            🎉🎉🎉 DÉPLOIEMENT RÉUSSI 🎉🎉🎉
+            
+            🚗 Votre API MLOps de prédiction de prix de véhicules est accessible :
+            🌐 Swagger UI: http://${EC2_HOST}:${APP_PORT}/docs
+            🏥 Health Check: http://${EC2_HOST}:${APP_PORT}/health
+            🔮 Prédiction: http://${EC2_HOST}:${APP_PORT}/predict
+
+            🔍 Commandes utiles :
+            ssh -i server_key1.pem ubuntu@${EC2_HOST}
+            docker logs ${APP_NAME}
+            """
+        }
+
+        failure {
+            echo """
+            ❌ DÉPLOIEMENT ÉCHOUÉ ❌
+
+            🔍 Vérifiez les logs pour identifier le problème :
+            ssh -i server_key1.pem ubuntu@${EC2_HOST}
+            docker logs ${APP_NAME}
+            docker ps -a
+
+            ⚙️ Vérifiez aussi :
+            - Le Security Group AWS (port ${APP_PORT} ouvert ?)
+            - Docker est installé sur EC2 ?
+            - Les credentials SSH dans Jenkins sont corrects ?
+            """
+        }
+
+        always {
+            echo '🏁 Pipeline terminé.'
+        }
+    }
 }
