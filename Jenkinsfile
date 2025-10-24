@@ -44,28 +44,24 @@ pipeline {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << 'ENDSSH'
                             echo "🧹 Nettoyage des anciens containers..."
-                            docker stop ${APP_NAME} 2>/dev/null || true
-                            docker rm ${APP_NAME} 2>/dev/null || true
-                            docker rmi ${DOCKER_IMAGE} 2>/dev/null || true
+                            docker stop vehicule_price_api 2>/dev/null || true
+                            docker rm vehicule_price_api 2>/dev/null || true
+                            docker rmi vehicule-price-api:latest 2>/dev/null || true
 
                             echo "📥 Mise à jour du code source depuis GitHub..."
-                            if [ -d ${APP_NAME} ]; then
-                                cd ${APP_NAME}
-                                git pull origin main
-                                cd ..
-                            else
-                                git clone ${GITHUB_REPO}
-                            fi
+                            cd ~ || exit 1
+                            rm -rf MLops_vehicule_price
+                            git clone https://github.com/sloffer47/MLops_vehicule_price.git
 
                             echo "🔨 Construction de l'image Docker..."
-                            cd ${APP_NAME}
-                            docker build -t ${DOCKER_IMAGE} .
+                            cd MLops_vehicule_price || exit 1
+                            docker build -t vehicule-price-api:latest .
 
-                            echo "🚀 Lancement du container sur le port ${APP_PORT}..."
-                            docker run -d --name ${APP_NAME} -p ${APP_PORT}:${APP_PORT} --restart unless-stopped ${DOCKER_IMAGE}
+                            echo "🚀 Lancement du container sur le port 8000..."
+                            docker run -d --name vehicule_price_api -p 8000:8000 --restart unless-stopped vehicule-price-api:latest
 
                             echo "✅ Container déployé avec succès !"
-                            docker ps | grep ${APP_NAME} || (echo "❌ Erreur de déploiement !" && exit 1)
+                            docker ps | grep vehicule_price_api || (echo "❌ Erreur de déploiement !" && exit 1)
 
                             echo "🧹 Nettoyage des images Docker inutiles..."
                             docker image prune -f
