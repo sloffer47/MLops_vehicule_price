@@ -32,7 +32,7 @@ pipeline {
             steps {
                 echo '🔐 Test de connexion SSH au serveur EC2...'
                 sshagent([SSH_CREDENTIALS]) {
-                    sh 'ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "echo ✅ Connexion SSH réussie au serveur ${EC2_HOST}"'
+                    sh "ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} 'echo ✅ Connexion SSH réussie'"
                 }
             }
         }
@@ -42,7 +42,7 @@ pipeline {
                 echo "🚢 Déploiement du container sur EC2 (${EC2_HOST})..."
                 sshagent(credentials: [SSH_CREDENTIALS]) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << 'ENDSSH'
                             echo "🧹 Nettoyage des anciens containers..."
                             docker stop ${APP_NAME} 2>/dev/null || true
                             docker rm ${APP_NAME} 2>/dev/null || true
@@ -69,7 +69,7 @@ pipeline {
 
                             echo "🧹 Nettoyage des images Docker inutiles..."
                             docker image prune -f
-                        '
+ENDSSH
                     """
                 }
             }
@@ -77,7 +77,7 @@ pipeline {
 
         stage('🏥 Health Check') {
             steps {
-                echo '💊 Vérification de la santé de l’API...'
+                echo '💊 Vérification de la santé de l\'API...'
                 script {
                     sleep(10)
                     try {
@@ -93,7 +93,7 @@ pipeline {
                             echo "⚠️ WARNING: Code de réponse HTTP: ${response}"
                         }
                     } catch (Exception e) {
-                        echo "⚠️ Impossible de tester l’API - Vérifiez le Security Group AWS (port ${APP_PORT}) ou les logs Docker sur EC2."
+                        echo "⚠️ Impossible de tester l'API - Vérifiez le Security Group AWS (port ${APP_PORT}) ou les logs Docker sur EC2."
                     }
                 }
             }
