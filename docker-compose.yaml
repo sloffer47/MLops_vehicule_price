@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: vehicule_price_api
+    ports:
+      - "7777:7777"
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    restart: unless-stopped
+    networks:
+      - mlops
+
+  airflow:
+    image: apache/airflow:2.7.0-python3.11
+    container_name: airflow
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - ./api:/opt/airflow/api
+      - ./data:/opt/airflow/data
+      - ./models:/opt/airflow/models
+      - ./requirements.txt:/opt/airflow/requirements.txt
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      - _PIP_ADDITIONAL_REQUIREMENTS=scikit-learn pandas numpy mlflow
+    user: "50000:0"
+    command: >
+      bash -c "
+        pip install -r /opt/airflow/requirements.txt &&
+        airflow db init &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@mlops.com || true &&
+        airflow webserver & airflow scheduler
+      "
+    restart: unless-stopped
+    networks:
+      - mlops
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.8.0
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlflow/mlruns
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlflow/mlruns
+    restart: unless-stopped
+    networks:
+      - mlops
+
+networks:
+  mlops:
+    driver: bridge
