@@ -37,34 +37,52 @@ pipeline {
             }
         }
 
+        stage('🧹 Nettoyage préventif EC2') {
+            steps {
+                echo '🗑️ Libération d\'espace disque sur EC2...'
+                sshagent(credentials: [SSH_CREDENTIALS]) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << 'ENDSSH'
+                            echo "📊 Espace disque AVANT nettoyage :"
+                            df -h /
+                            
+                            echo "🧹 Nettoyage Docker agressif..."
+                            docker system prune -a --volumes -f || true
+                            
+                            echo "🗑️ Suppression anciens builds..."
+                            rm -rf ~/MLops_vehicule_price 2>/dev/null || true
+                            
+                            echo "📊 Espace disque APRÈS nettoyage :"
+                            df -h /
+ENDSSH
+                    """
+                }
+            }
+        }
+
         stage('🚀 Deploy to EC2 Server') {
             steps {
                 echo "🚢 Déploiement du container sur EC2 (${EC2_HOST})..."
                 sshagent(credentials: [SSH_CREDENTIALS]) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << 'ENDSSH'
-                            echo "🧹 Nettoyage des anciens containers..."
+                            echo "🛑 Arrêt des anciens containers..."
                             docker stop vehicule_price_api 2>/dev/null || true
                             docker rm vehicule_price_api 2>/dev/null || true
-                            docker rmi vehicule-price-api:latest 2>/dev/null || true
 
-                            echo "📥 Mise à jour du code source depuis GitHub..."
+                            echo "📥 Clone du code depuis GitHub..."
                             cd ~ || exit 1
-                            rm -rf MLops_vehicule_price
                             git clone https://github.com/sloffer47/MLops_vehicule_price.git
+                            cd MLops_vehicule_price || exit 1
 
                             echo "🔨 Construction de l'image Docker..."
-                            cd MLops_vehicule_price || exit 1
-                            docker build -t vehicule-price-api:latest .
+                            docker build --no-cache -t vehicule-price-api:latest . || exit 1
 
-                            echo "🚀 Lancement du container sur le port 8000..."
+                            echo "🚀 Lancement du container..."
                             docker run -d --name vehicule_price_api -p 8000:8000 --restart unless-stopped vehicule-price-api:latest
 
-                            echo "✅ Container déployé avec succès !"
-                            docker ps | grep vehicule_price_api || (echo "❌ Erreur de déploiement !" && exit 1)
-
-                            echo "🧹 Nettoyage des images Docker inutiles..."
-                            docker image prune -f
+                            echo "✅ Déploiement terminé !"
+                            docker ps | grep vehicule_price_api || (echo "❌ Container introuvable" && exit 1)
 ENDSSH
                     """
                 }
